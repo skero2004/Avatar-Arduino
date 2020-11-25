@@ -1,4 +1,5 @@
 #include <RGBmatrixPanel.h>
+#include <NewPing.h>
 
 // For LED matrix
 #define CLK 11
@@ -18,10 +19,33 @@
 #define DIR_EXT 3
 #define PWM_MAX 80
 
-//-------- LED matrix setup --------//
+// For sensors
+#define LIMIT 30
+#define FL_TRIG 38
+#define FL_ECHO 39
+#define FR_TRIG 36
+#define FR_ECHO 37
+#define BL_TRIG 34
+#define BL_ECHO 35
+#define BR_TRIG 32
+#define BR_ECHO 33
+#define MAX_DIST 350
 
+// LED matrix setup
 RGBmatrixPanel matrix(A, B, C, D, CLK, LAT, OE, false, 64);
 String text = "FRC Team 568 The Nerds of the North";
+
+// Ultrasonic sensors setup
+NewPing sonarFL(FL_TRIG, FL_ECHO, MAX_DIST);
+NewPing sonarFR(FR_TRIG, FR_ECHO, MAX_DIST);
+NewPing sonarBL(BL_TRIG, BL_ECHO, MAX_DIST);
+NewPing sonarBR(BR_TRIG, BR_ECHO, MAX_DIST);
+unsigned long int prevMillisFL = 0;
+unsigned long int prevMillisFR = 0;
+unsigned long int prevMillisBL = 0;
+unsigned long int prevMillisBR = 0;
+const int INTERVAL = 50;
+
 void setup() {
 
   Serial.begin(74880);
@@ -49,9 +73,15 @@ void setup() {
   pinMode(DIR_R, OUTPUT);
   pinMode(DIR_L, OUTPUT);
   pinMode(DIR_EXT, OUTPUT);
+  pinMode(LIMIT, INPUT);
 
 }
 
+// Variables for sensor inputs
+double durationFL, distanceFL, durationFR, distanceFR, durationBL, distanceBL, durationBR, distanceBR;
+int limit;
+
+// Variables for moving the robot
 double multiplier = 1;
 bool forward = false;
 bool backward = false;
@@ -62,61 +92,11 @@ bool down = false;
 
 void loop() {
 
+  // Sensors
+  useSensors();
+
   // Move robot
-  if (forward) {
-
-    digitalWrite(DIR_L, HIGH);
-    digitalWrite(DIR_R, HIGH);
-    analogWrite(PWM_L, PWM_MAX * multiplier);
-    analogWrite(PWM_R, PWM_MAX * multiplier);
-    
-  } else if (backward) {
-
-    digitalWrite(DIR_L, LOW);
-    digitalWrite(DIR_R, LOW);
-    analogWrite(PWM_L, PWM_MAX * multiplier);
-    analogWrite(PWM_R, PWM_MAX * multiplier);
-    
-  } else if (right) {
-
-    digitalWrite(DIR_L, HIGH);
-    digitalWrite(DIR_R, LOW);
-    analogWrite(PWM_L, PWM_MAX * multiplier);
-    analogWrite(PWM_R, PWM_MAX * multiplier);
-    
-  } else if (left) {
-
-    digitalWrite(DIR_L, LOW);
-    digitalWrite(DIR_R, HIGH);
-    analogWrite(PWM_L, PWM_MAX * multiplier);
-    analogWrite(PWM_R, PWM_MAX * multiplier);
-    
-  } else {
-
-    digitalWrite(DIR_L, LOW);
-    digitalWrite(DIR_R, LOW);
-    analogWrite(PWM_L, 0);
-    analogWrite(PWM_R, 0);
-    
-  }
-
-  // Move extender
-  if (up) {
-
-    digitalWrite(DIR_EXT, HIGH);
-    analogWrite(PWM_EXT, PWM_MAX * multiplier);
-    
-  } else if (down) {
-
-    digitalWrite(DIR_EXT, LOW);
-    analogWrite(PWM_EXT, PWM_MAX * multiplier);
-    
-  } else {
-
-    digitalWrite(DIR_EXT, LOW);
-    analogWrite(PWM_EXT, 0);
-    
-  }
+  moveRobot();
   
   // Check for input command
   while (Serial.available() > 0) {
@@ -214,6 +194,99 @@ void loop() {
 
   }
 
+}
+
+void useSensors() {
+
+  // Limit switch
+  limit = digitalRead(LIMIT) * -1;
+
+  //-------- Ultrasonic sensors --------//
+
+  if (prevMillisFL <= millis()) {
+
+    prevMillisFL += INTERVAL;
+    distanceFL = sonarFL.ping_cm();
+    
+  }
+  if (prevMillisFR <= millis()) {
+
+    prevMillisFR += INTERVAL;
+    distanceFR = sonarFR.ping_cm();
+    
+  }
+  if (prevMillisBL <= millis()) {
+
+    prevMillisBL += INTERVAL;
+    distanceBL = sonarBL.ping_cm();
+    
+  }
+  if (prevMillisBR <= millis()) {
+
+    prevMillisBR += INTERVAL;
+    distanceBR = sonarBR.ping_cm();
+ 
+  }
+  
+}
+
+void moveRobot() {
+
+  if (forward) {
+
+    digitalWrite(DIR_L, HIGH);
+    digitalWrite(DIR_R, HIGH);
+    analogWrite(PWM_L, PWM_MAX * multiplier);
+    analogWrite(PWM_R, PWM_MAX * multiplier);
+    
+  } else if (backward) {
+
+    digitalWrite(DIR_L, LOW);
+    digitalWrite(DIR_R, LOW);
+    analogWrite(PWM_L, PWM_MAX * multiplier);
+    analogWrite(PWM_R, PWM_MAX * multiplier);
+    
+  } else if (right) {
+
+    digitalWrite(DIR_L, HIGH);
+    digitalWrite(DIR_R, LOW);
+    analogWrite(PWM_L, PWM_MAX * multiplier);
+    analogWrite(PWM_R, PWM_MAX * multiplier);
+    
+  } else if (left) {
+
+    digitalWrite(DIR_L, LOW);
+    digitalWrite(DIR_R, HIGH);
+    analogWrite(PWM_L, PWM_MAX * multiplier);
+    analogWrite(PWM_R, PWM_MAX * multiplier);
+    
+  } else {
+
+    digitalWrite(DIR_L, LOW);
+    digitalWrite(DIR_R, LOW);
+    analogWrite(PWM_L, 0);
+    analogWrite(PWM_R, 0);
+    
+  }
+
+  // Move extender
+  if (up) {
+
+    digitalWrite(DIR_EXT, HIGH);
+    analogWrite(PWM_EXT, PWM_MAX * multiplier);
+    
+  } else if (down) {
+
+    digitalWrite(DIR_EXT, LOW);
+    analogWrite(PWM_EXT, PWM_MAX * multiplier);
+    
+  } else {
+
+    digitalWrite(DIR_EXT, LOW);
+    analogWrite(PWM_EXT, 0);
+    
+  }
+  
 }
 
 uint16_t Wheel(byte WheelPos) {
