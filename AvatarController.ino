@@ -3,21 +3,27 @@
 
 // For LED matrix
 #define CLK 11
-#define OE   9
+#define OE 9
 #define LAT 10
-#define A   A0
-#define B   A1
-#define C   A2
-#define D   A3
+#define A A0
+#define B A1
+#define C A2
+#define D A3
 
 // For motors
 #define PWM_R 7
-#define PWM_L 12
+#define PWM_L 4
 #define PWM_EXT 5
 #define DIR_R 8
 #define DIR_L 6
 #define DIR_EXT 3
-#define PWM_MAX 80
+#define DRIVE_SPEED 80 // Max is 255
+#define EXT_SPEED 255
+
+// For encoders
+#define CH_A 20
+#define CH_B 21
+#define MAX_COUNT 50000
 
 // For sensors
 #define LIMIT 30
@@ -34,6 +40,9 @@
 // LED matrix setup
 RGBmatrixPanel matrix(A, B, C, D, CLK, LAT, OE, false, 64);
 String text = "FRC Team 568 The Nerds of the North";
+
+// Encoder setup
+volatile long counter = 0;
 
 // Ultrasonic sensors setup
 NewPing sonarFL(FL_TRIG, FL_ECHO, MAX_DIST);
@@ -74,6 +83,11 @@ void setup() {
   pinMode(DIR_L, OUTPUT);
   pinMode(DIR_EXT, OUTPUT);
   pinMode(LIMIT, INPUT);
+  pinMode(CH_A, INPUT_PULLUP);
+  pinMode(CH_B, INPUT_PULLUP);
+
+  // Attach interrupt for encoders
+  attachInterrupt(digitalPinToInterrupt(CH_A), getEncoderVals, RISING);
 
 }
 
@@ -91,6 +105,8 @@ bool up = false;
 bool down = false;
 
 void loop() {
+
+  // Serial.println(counter);
 
   // Sensors
   useSensors();
@@ -163,7 +179,7 @@ void loop() {
       down = false;
       
     } else if (d == "i") {
-
+   
       // Retract down
       up = false;
       down = true;
@@ -192,6 +208,20 @@ void loop() {
       
     }
 
+  }
+
+}
+
+void getEncoderVals() {
+
+  if (digitalRead(CH_B) != digitalRead(CH_A)) {
+
+    counter--;
+      
+  } else {
+
+    counter++;
+      
   }
 
 }
@@ -234,36 +264,34 @@ void moveRobot() {
 
   if (forward) {
 
-    digitalWrite(DIR_L, HIGH);
-    digitalWrite(DIR_R, HIGH);
-    analogWrite(PWM_L, PWM_MAX * multiplier);
-    analogWrite(PWM_R, PWM_MAX * multiplier);
+    digitalWrite(DIR_L, LOW);
+    digitalWrite(DIR_R, LOW);
+    analogWrite(PWM_L, DRIVE_SPEED * multiplier);
+    analogWrite(PWM_R, DRIVE_SPEED * multiplier);
     
   } else if (backward) {
 
-    digitalWrite(DIR_L, LOW);
-    digitalWrite(DIR_R, LOW);
-    analogWrite(PWM_L, PWM_MAX * multiplier);
-    analogWrite(PWM_R, PWM_MAX * multiplier);
+    digitalWrite(DIR_L, HIGH);
+    digitalWrite(DIR_R, HIGH);
+    analogWrite(PWM_L, DRIVE_SPEED * multiplier);
+    analogWrite(PWM_R, DRIVE_SPEED * multiplier);
     
   } else if (right) {
 
-    digitalWrite(DIR_L, HIGH);
-    digitalWrite(DIR_R, LOW);
-    analogWrite(PWM_L, PWM_MAX * multiplier);
-    analogWrite(PWM_R, PWM_MAX * multiplier);
+    digitalWrite(DIR_L, LOW);
+    digitalWrite(DIR_R, HIGH);
+    analogWrite(PWM_L, DRIVE_SPEED * multiplier);
+    analogWrite(PWM_R, DRIVE_SPEED * multiplier);
     
   } else if (left) {
 
-    digitalWrite(DIR_L, LOW);
-    digitalWrite(DIR_R, HIGH);
-    analogWrite(PWM_L, PWM_MAX * multiplier);
-    analogWrite(PWM_R, PWM_MAX * multiplier);
+    digitalWrite(DIR_L, HIGH);
+    digitalWrite(DIR_R, LOW);
+    analogWrite(PWM_L, DRIVE_SPEED * multiplier);
+    analogWrite(PWM_R, DRIVE_SPEED * multiplier);
     
   } else {
-
-    digitalWrite(DIR_L, LOW);
-    digitalWrite(DIR_R, LOW);
+    
     analogWrite(PWM_L, 0);
     analogWrite(PWM_R, 0);
     
@@ -272,17 +300,34 @@ void moveRobot() {
   // Move extender
   if (up) {
 
-    digitalWrite(DIR_EXT, HIGH);
-    analogWrite(PWM_EXT, PWM_MAX * multiplier);
+    if (counter < MAX_COUNT) {
+
+      digitalWrite(DIR_EXT, LOW);
+      analogWrite(PWM_EXT, EXT_SPEED);
+      
+    } else {
+
+      up = false;
+      down = false;
+      
+    }
     
   } else if (down) {
+    
+    if (counter > 0) {
+      
+      digitalWrite(DIR_EXT, HIGH);
+      analogWrite(PWM_EXT, EXT_SPEED);
+    
+    } else {
 
-    digitalWrite(DIR_EXT, LOW);
-    analogWrite(PWM_EXT, PWM_MAX * multiplier);
+      up = false;
+      down = false;
+        
+    }
     
   } else {
 
-    digitalWrite(DIR_EXT, LOW);
     analogWrite(PWM_EXT, 0);
     
   }
